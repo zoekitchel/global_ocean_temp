@@ -1,0 +1,140 @@
+---
+title: "Global SST Plot"
+output: html_notebook
+---
+
+```{r setup}
+library(ncdf4)
+library(raster)
+```
+
+
+
+```{bash download and format data for 3.3.1 soda}
+wget -X /Users/zoekitchel/Documents/grad\ school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2013.nc http://dsrs.atmos.umd.edu/DATA/soda3.3.1/REGRIDED/ocean/soda3.3.1_mn_ocean_reg_2013.nc
+wget -X /Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/ http://dsrs.atmos.umd.edu/DATA/soda3.3.1/REGRIDED/ocean/soda3.3.1_mn_ocean_reg_2014.nc
+wget -X /Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/ http://dsrs.atmos.umd.edu/DATA/soda3.3.1/REGRIDED/ocean/soda3.3.1_mn_ocean_reg_2015.nc
+
+#only surface layer
+ncks -d depth,0 "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2013.nc" "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2013_surf.nc"
+
+ncks -d depth,0 "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2014.nc" "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2014_surf.nc"
+
+ncks -d depth,0 "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2015.nc" "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2015_surf.nc"
+
+#only temperature
+ncks -v temp -O "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2013_surf.nc" "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2013_sst.nc"
+
+ncks -v temp -O "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2014_surf.nc" "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2014_sst.nc"
+
+ncks -v temp -O "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2015_surf.nc" "/Users/zoekitchel/Documents/grad school/Rutgers/Repositories/global_ocean_temp/soda3.3.1_mn_ocean_reg_2015_sst.nc"
+
+#merge all three files into one
+ncrcat soda3.3.1_mn_ocean_reg_2013_sst.nc soda3.3.1_mn_ocean_reg_2014_sst.nc soda3.3.1_mn_ocean_reg_2015_sst.nc -O soda3.3.1_2013_2015_sst_trawl.nc
+```
+Import late data
+```{r import data for post 1980 soda}
+#First, post 1980
+
+# =========================================
+# = Function to Read in SODA, Grab Surface = by Ryan
+# =========================================
+get.soda <- function(file){
+
+	soda.info <- nc_open(file)
+	name.soda.sizes <- sapply(soda.info$var$temp$dim, function(x)x$name)
+	soda.sizes <- soda.info$var$temp$size
+	dim.units <- sapply(soda.info$var$temp$dim, function(x)x$units)
+	print(dim.units)
+	names(soda.sizes) <- name.soda.sizes
+	ntime <- soda.sizes["time"]
+
+	time.start <- as.Date("1980-01-01") #set this to date you want to start at
+	soda.time <- seq.Date(time.start, by="1 month", length.out=ntime)
+	
+	soda <- brick(file)
+	names(soda) <- soda.time
+
+		
+	return(soda)
+	
+}
+	
+}
+
+soda_surface_3.3.1 <- get.soda("soda3.3.1_2013_2015_sst_trawl.nc")
+
+
+```
+Take average of modern layers (2013-2015, average of three)
+```{r avg of four years}
+soda_surface_2000_avg <- calc(soda_surface_3.3.1, fun = mean, na.rm = T)
+plot(soda_surface_2000_avg)
+plot()
+```
+
+
+
+historic temp = 1900-1903
+```{r import data for pre 1980 soda}
+#Now, pre 1980
+
+# =========================================
+# = Function to Read in SODA, Grab Surface = by Ryan
+# =========================================
+get.soda <- function(file){
+
+	soda.info <- nc_open(file)
+	name.soda.sizes <- sapply(soda.info$var$temp$dim, function(x)x$name)
+	soda.sizes <- soda.info$var$temp$size
+	dim.units <- sapply(soda.info$var$temp$dim, function(x)x$units)
+	print(dim.units)
+	stopifnot(grepl("months since ", dim.units[4])) # make sure time is in correct units and in right place
+	names(soda.sizes) <- name.soda.sizes
+	ntime <- soda.sizes["time"]
+	ndepth <- soda.sizes["depth"]
+
+	soda.time0 <- soda.info$var$temp$dim[[4]]$vals
+	ref.date <- as.Date(gsub("months since ", "", dim.units[4]))
+	start.before.ref <- grepl("-", soda.time0[1]) # is the first date before ref.date?
+	n.month.before <- ceiling(abs(soda.time0[1])) + as.integer(start.before.ref)
+	start.increment <- ifelse(start.before.ref, "-1 month", "1 month")
+	time.start <- rev(seq.Date(ref.date, by=start.increment, length.out=n.month.before))[1]
+	soda.time <- seq.Date(time.start, by="1 month", length.out=ntime)
+	
+	soda <- brick(file)
+	names(soda) <- soda.time
+
+		
+	return(soda)
+	
+}
+
+soda_surface_2.2.4 <- get.soda("historic_temp.nc")
+dim(soda_surface_2.2.4)
+#dim1: 330 (longitude) rows
+#dim2: 720 (?) columns 
+#dim3: 48 (months) (12*4 years) each layer = month
+
+soda_surface_2.2.4
+```
+Take average of all values for historic layers (1900-1904, average of four years)
+```{r avg of 1900-1904 years}
+soda_surface_1900_avg <- calc(soda_surface_2.2.4, fun = mean, na.rm = T)
+plot(soda_surface_1900_avg)
+```
+
+Take difference of two raster layers
+```{r difference between layers}
+soda_temp_dif <- (soda_surface_2000_avg)-(soda_surface_1900_avg)
+pal <- colorRampPalette(c("blue","grey", "red"))
+plot(soda_temp_dif, col = pal(20))
+
+#crop to just NE US
+e <- as(extent(270, 300, 40, 50), 'SpatialPolygons')
+crs(e) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
+r <- crop(soda_temp_dif, e)
+plot(r)
+
+```
+

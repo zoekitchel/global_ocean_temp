@@ -1,0 +1,15 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+historic_temp.nc
+soda3.3.1_mn_ocean_reg_2013.nc
+soda3.3.1_mn_ocean_reg_2014.nc
+soda3.3.1_mn_ocean_reg_2015.nc
+soda3.3.1_mn_ocean_reg_2013_surf.nc
+soda3.3.1_mn_ocean_reg_2014_surf.nc
+soda3.3.1_mn_ocean_reg_2015_surf.nc
+soda3.3.1_mn_ocean_reg_2013_sst.nc
+soda3.3.1_mn_ocean_reg_2014_sst.nc
+soda3.3.1_mn_ocean_reg_2015_sst.nc
+soda3.3.1_2013_2015_sst_trawl.nc
